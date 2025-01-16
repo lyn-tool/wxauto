@@ -427,7 +427,61 @@ class WeChat(WeChatBase):
                 if editbox.GetValuePattern().Value:
                     break
         editbox.SendKeys('{Enter}')
-        
+    def PasteMsg(self, msg, who=None, clear=True, at=None):
+            """粘贴文本消息
+
+            Args:
+                msg (str): 要粘贴的文本消息
+                who (str): 要粘贴给谁，如果为None，则粘贴到当前聊天页面。  *最好完整匹配，优先使用备注
+                clear (bool, optional): 是否清除原本的内容，
+                at (str|list, optional): 要@的人，可以是一个人或多个人，格式为str或list，例如："张三"或["张三", "李四"]
+            """
+            if FindWindow(name=who, classname='ChatWnd'):
+                chat = ChatWnd(who, self.language)
+                chat.PasteMsg(msg, at=at)
+                return None
+            if not msg and not at:
+                return None
+            if who:
+                try:
+                    editbox = self.ChatBox.EditControl(searchDepth=10)
+                    if who in self.CurrentChat() and who in editbox.Name:
+                        pass
+                    else:
+                        self.ChatWith(who)
+                        editbox = self.ChatBox.EditControl(Name=who, searchDepth=10)
+                except:
+                    self.ChatWith(who)
+                    editbox = self.ChatBox.EditControl(Name=who, searchDepth=10)
+            else:
+                editbox = self.ChatBox.EditControl(searchDepth=10)
+            if clear:
+                editbox.SendKeys('{Ctrl}a', waitTime=0)
+            self._show()
+            if not editbox.HasKeyboardFocus:
+                editbox.Click(simulateMove=False)
+            
+            if at:
+                if isinstance(at, str):
+                    at = [at]
+                for i in at:
+                    editbox.SendKeys('@'+i)
+                    atwnd = self.UiaAPI.PaneControl(ClassName='ChatContactMenu')
+                    if atwnd.Exists(maxSearchSeconds=0.1):
+                        atwnd.SendKeys('{ENTER}')
+                        if msg and not msg.startswith('\n'):
+                            msg = '\n' + msg
+
+            if msg:
+                t0 = time.time()
+                while True:
+                    if time.time() - t0 > 10:
+                        raise TimeoutError(f'粘贴消息超时 --> {editbox.Name} - {msg}')
+                    SetClipboardText(msg)
+                    editbox.SendKeys('{Ctrl}v')
+                    if editbox.GetValuePattern().Value:
+                        break
+
     def SendFiles(self, filepath, who=None):
         """向当前聊天窗口发送文件
         

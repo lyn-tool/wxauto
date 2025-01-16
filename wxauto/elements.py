@@ -254,6 +254,38 @@ class ChatWnd(WeChatBase):
                 break
         self.editbox.SendKeys('{Enter}')
 
+    def PasteMsg(self, msg, at=None):
+        """仅粘贴文本消息
+
+        Args:
+            msg (str): 要粘贴的文本消息
+            at (str|list, optional): 要@的人，可以是一个人或多个人，格式为str或list，例如："张三"或["张三", "李四"]
+        """
+        wxlog.debug(f"粘贴消息：{self.who} --> {msg}")
+        self._show()
+        if not self.editbox.HasKeyboardFocus:
+            self.editbox.Click(simulateMove=False)
+
+        if at:
+            if isinstance(at, str):
+                at = [at]
+            for i in at:
+                self.editbox.SendKeys('@'+i)
+                atwnd = self.UiaAPI.PaneControl(ClassName='ChatContactMenu')
+                if atwnd.Exists(maxSearchSeconds=0.1):
+                    atwnd.SendKeys('{ENTER}')
+                    if msg and not msg.startswith('\n'):
+                        msg = '\n' + msg
+
+        t0 = time.time()
+        while True:
+            if time.time() - t0 > 10:
+                raise TimeoutError(f'粘贴消息超时 --> {self.who} - {msg}')
+            SetClipboardText(msg)
+            self.editbox.SendKeys('{Ctrl}v')
+            if self.editbox.GetValuePattern().Value:
+                break
+            
     def SendFiles(self, filepath):
         """向当前聊天窗口发送文件
         
